@@ -1,0 +1,15 @@
+Django==5.2.17
+djangorestframework==3.16.1
+django-cors-headers==4.9.0
+django-prometheus==2.5.0
+dj-database-url==2.3.0
+whitenoise==6.12.0
+psycopg[binary]==3.2.13
+celery[redis]==5.5.3
+redis==5.2.1
+dnspython==2.8.0
+pyotp==2.10.0
+qrcode==8.2
+requests==2.34.2
+gunicorn==23.0.0
+cryptography==46.0.7

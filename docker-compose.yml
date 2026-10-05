@@ -1,0 +1,133 @@
+# BThinkX Email Platform — application server (SERVER 1).
+# Mailcow runs on a separate mail server (SERVER 2); see deploy/mailcow/README.md.
+#
+#   cp .env.example .env   # fill in every value
+#   docker compose up -d --build
+#
+name: bthinkx-mail
+
+x-backend: &backend
+  build:
+    context: ./backend
+  image: bthinkx-mail/backend:${APP_VERSION:-latest}
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    CACHE_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+    CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+  restart: unless-stopped
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  # internal: postgres/redis; edge: egress to Mailcow API, DNS resolvers and SMTP
+  networks: [internal, edge]
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  logging: &logging
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [internal]
+    shm_size: 256mb
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    restart: unless-stopped
+    networks: [internal]
+    logging: *logging
+
+  backend:
+    <<: *backend
+    command: ["web"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CACHE_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+      RUN_MIGRATIONS: "1"
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout 10 | grep -q pong"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      backend: { condition: service_healthy }
+
+  beat:
+    <<: *backend
+    command: ["beat"]
+    healthcheck: { disable: true }
+    depends_on:
+      backend: { condition: service_healthy }
+
+  web:
+    build:
+      context: ./frontend
+    image: bthinkx-mail/web:${APP_VERSION:-latest}
+    environment:
+      PORTAL_HOSTNAME: ${PORTAL_HOSTNAME}
+      BACKEND_UPSTREAM: backend:8000
+      ADMIN_PATH: ${ADMIN_URL:-django-admin/}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme:/var/www/certbot:ro
+    depends_on:
+      backend: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [internal, edge]
+    logging: *logging
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tls"]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+    restart: unless-stopped
+    networks: [edge]
+
+volumes:
+  pgdata:
+  redisdata:
+  letsencrypt:
+  acme:
+
+networks:
+  internal:
+    internal: true
+  edge:
