@@ -1,0 +1,49 @@
+import "@fontsource/instrument-sans/400.css";
+import "@fontsource/instrument-sans/500.css";
+import "@fontsource/instrument-sans/600.css";
+import "@fontsource/instrument-sans/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "./styles.css";
+
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+
+import { ApiError } from "./api";
+import App from "./App";
+import { AuthProvider } from "./auth";
+import { ToastProvider } from "./components/ui";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+      retry: (count, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && count < 2,
+    },
+  },
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      // Any change may affect counters/usage shown elsewhere.
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+    },
+  }),
+});
+
+const root = document.getElementById("root");
+if (!root) throw new Error("Missing #root element");
+
+createRoot(root).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToastProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);

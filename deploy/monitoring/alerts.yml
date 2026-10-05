@@ -1,0 +1,23 @@
+groups:
+  - name: bthinkx
+    rules:
+      - alert: PortalDown
+        expr: up{job="django"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "Portal backend is not responding to Prometheus" }
+      - alert: HighErrorRate
+        expr: sum(rate(django_http_responses_total_by_status_total{status=~"5.."}[5m])) / clamp_min(sum(rate(django_http_responses_total_by_status_total[5m])), 1) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "More than 5% of portal requests are failing" }
+      - alert: DiskAlmostFull
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) > 0.8
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is over 80% full" }
+      - alert: MemoryPressure
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 10m
+        labels: { severity: critical }
+        annotations: { summary: "Less than 10% memory available on {{ $labels.instance }}" }
