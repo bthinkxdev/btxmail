@@ -53,3 +53,10 @@ export const ROLE_LABEL: Record<string, string> = {
   OPS_ADMIN: "Operations admin",
   BUSINESS_ADMIN: "Business admin",
 };
+
+/** Never show the name of the underlying mail software to users. */
+export function plainText(text: string): string {
+  return text
+    .replace(/-mailcow/gi, "")
+    .replace(/mailcow/gi, "mail server");
+}

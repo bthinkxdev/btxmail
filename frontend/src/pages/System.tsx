@@ -1,7 +1,7 @@
 import { api } from "../api";
 import { useMe } from "../auth";
 import { Badge, Empty, ErrorNotice, Loading, PageHead } from "../components/ui";
-import { relative } from "../format";
+import { plainText, relative } from "../format";
 import { useAction, useApiGet } from "../hooks";
 import type { Alert, Page, Reputation } from "../types";
 
@@ -61,7 +61,7 @@ export default function System() {
                     <tr key={name}>
                       <td>{COMPONENT_LABEL[name] ?? name}</td>
                       <td><Badge value={c.status} /></td>
-                      <td className="small">{c.message}</td>
+                      <td className="small">{plainText(c.message)}</td>
                       <td className="muted small">{relative(c.checked_at)}</td>
                     </tr>
                   ))}
@@ -110,7 +110,7 @@ export default function System() {
                   <tr key={a.id}>
                     <td className="muted small">{relative(a.created_at)}</td>
                     <td><Badge value={a.severity} /></td>
-                    <td><strong>{a.title}</strong><div className="small muted" style={{ whiteSpace: "pre-line" }}>{a.message}</div></td>
+                    <td><strong>{plainText(a.title)}</strong><div className="small muted" style={{ whiteSpace: "pre-line" }}>{plainText(a.message)}</div></td>
                     <td className="small">{a.delivered ? "Yes" : a.delivery_error ? "Failed" : "Pending"}</td>
                     <td><button className="btn small" onClick={() => ack.mutate(a.id)} disabled={ack.isPending}>Acknowledge</button></td>
                   </tr>

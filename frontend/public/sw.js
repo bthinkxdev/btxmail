@@ -8,7 +8,7 @@
 const VERSION = "__SW_VERSION__";
 const PRECACHE = "btx-shell-" + VERSION;
 const RUNTIME = "btx-runtime-v1";
-const SHELL_URLS = self.__PRECACHE_URLS__ || ["/", "/offline.html", "/manifest.webmanifest", "/favicon.svg"];
+const SHELL_URLS = self.__PRECACHE_URLS__ || ["/", "/offline.html", "/manifest.webmanifest", "/favicon.png", "/logo-mark.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

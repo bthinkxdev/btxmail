@@ -8,12 +8,7 @@ import { pushSupported, syncPushSubscription, usePush } from "../push";
 import { useToast } from "./ui";
 
 export function Logo({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <circle cx="16" cy="16" r="14" fill="none" stroke="#7d95ff" strokeWidth="2.5" />
-      <path d="M8 12h16v10H8z M8 12l8 6 8-6" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
-    </svg>
-  );
+  return <img src="/logo-mark.png" width={size} height={size} alt="" className="logo-mark" />;
 }
 
 export default function Layout() {
