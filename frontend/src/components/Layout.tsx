@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useMe, useAuth } from "../auth";
 import { ROLE_LABEL } from "../format";
 import { useInstall } from "../pwa";
+import { pushSupported, syncPushSubscription, usePush } from "../push";
+import { useToast } from "./ui";
 
 export function Logo({ size = 26 }: { size?: number }) {
   return (
@@ -20,6 +22,24 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const install = useInstall();
+  const push = usePush();
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("btx-push-dismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    void syncPushSubscription();
+  }, []);
+  const offerPush = pushSupported() && !push.subscribed && push.permission === "default" && !dismissed;
+  const toast = useToast();
+  const installApp = () => {
+    if (install.kind === "prompt") install.install();
+    else if (install.kind === "ios") toast.ok("Tap the Share button, then “Add to Home Screen”.");
+    else toast.ok("Open your browser menu and choose “Install app” or “Add to Home screen”.");
+  };
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(location.pathname);
   if (lastPath !== location.pathname) {
@@ -34,9 +54,16 @@ export default function Layout() {
         <span className="brand" style={{ padding: 0 }}>
           <Logo size={22} /> BThinkX Mail
         </span>
-        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="sidebar">
-          Menu
-        </button>
+        <span className="topbar-actions">
+          {install.kind !== "installed" && (
+            <button type="button" onClick={installApp}>
+              Install
+            </button>
+          )}
+          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="sidebar">
+            Menu
+          </button>
+        </span>
       </div>
       {open && <div className="scrim" onClick={() => setOpen(false)} aria-hidden="true" />}
       <aside id="sidebar" className={`sidebar${open ? " open" : ""}`}>
@@ -59,16 +86,15 @@ export default function Layout() {
           {staff && <NavLink to="/plans">Plans</NavLink>}
           {staff && <NavLink to="/system">Mail server health</NavLink>}
           <NavLink to="/account">My account</NavLink>
+          {install.kind !== "installed" && (
+            <button type="button" className="nav-install" onClick={installApp}>
+              <span aria-hidden="true">⤓</span> Install app
+            </button>
+          )}
         </nav>
         <div className="sidebar-foot">
           <span className="who">{me.full_name || me.email}</span>
           <span>{me.business_name ?? ROLE_LABEL[me.role]}</span>
-          {install.kind === "prompt" && (
-            <button type="button" onClick={install.install}>
-              Install app
-            </button>
-          )}
-          {install.kind === "ios" && <span>To install: tap Share, then �Add to Home Screen�.</span>}
           <button
             onClick={async () => {
               await logout();
@@ -80,6 +106,35 @@ export default function Layout() {
         </div>
       </aside>
       <main className="main" id="content">
+        {offerPush && (
+          <div className="notice info push-offer" role="region" aria-label="Notifications">
+            <span>Get a notification when new mail arrives or something needs your attention.</span>
+            <span className="actions">
+              <button
+                type="button"
+                className="btn primary small"
+                disabled={push.busy}
+                onClick={() => void push.enable().catch((e: unknown) => toast.error(e instanceof Error ? e.message : e))}
+              >
+                Turn on
+              </button>
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => {
+                  setDismissed(true);
+                  try {
+                    localStorage.setItem("btx-push-dismissed", "1");
+                  } catch {
+                    /* storage unavailable */
+                  }
+                }}
+              >
+                Not now
+              </button>
+            </span>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

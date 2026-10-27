@@ -10,6 +10,7 @@ from apps.core import views as core_views
 from apps.domains.views import DomainViewSet
 from apps.mailboxes.views import AliasViewSet, MailboxViewSet
 from apps.monitoring import views as monitoring_views
+from apps.notifications import views as notification_views
 from apps.security.views import SecurityEventViewSet
 
 router = DefaultRouter(trailing_slash=True)
@@ -47,6 +48,11 @@ api_patterns = [
     path("monitoring/reputation/", monitoring_views.ReputationView.as_view(), name="monitoring-reputation"),
     path("monitoring/run/", monitoring_views.RunChecksView.as_view(), name="monitoring-run"),
     path("monitoring/backup-report/", monitoring_views.BackupReportView.as_view(), name="monitoring-backup-report"),
+    path("notifications/config/", notification_views.PushConfigView.as_view(), name="push-config"),
+    path("notifications/preferences/", notification_views.PreferencesView.as_view(), name="push-preferences"),
+    path("notifications/subscriptions/", notification_views.SubscriptionView.as_view(), name="push-subscriptions"),
+    path("notifications/test/", notification_views.TestPushView.as_view(), name="push-test"),
+    path("push/new-mail/", notification_views.NewMailHookView.as_view(), name="push-new-mail"),
     path("", include(router.urls)),
 ]
 

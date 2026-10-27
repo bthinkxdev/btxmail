@@ -70,7 +70,11 @@ function isIosSafari(): boolean {
   return /iPad|iPhone|iPod/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
 }
 
-export type InstallState = { kind: "installed" | "none" } | { kind: "prompt"; install: () => void } | { kind: "ios" };
+export type InstallState = { kind: "installed" } | { kind: "prompt"; install: () => void } | { kind: "ios" } | { kind: "manual" };
+
+export function useStandalone(): boolean {
+  return isStandalone();
+}
 
 export function useInstall(): InstallState {
   const [event, setEvent] = useState<InstallPromptEvent | null>(null);
@@ -100,7 +104,7 @@ export function useInstall(): InstallState {
   if (installed) return { kind: "installed" };
   if (event) return { kind: "prompt", install };
   if (isIosSafari()) return { kind: "ios" };
-  return { kind: "none" };
+  return { kind: "manual" };
 }
 
 /** Offline notice and "new version" bar, shown above everything else. */

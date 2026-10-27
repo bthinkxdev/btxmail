@@ -76,6 +76,9 @@ def record_event(
         fingerprint=fingerprint,
         action_taken=action,
     )
+    from apps.notifications.push import notify_security_event
+
+    notify_security_event(event)
     return event
 
 

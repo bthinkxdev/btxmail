@@ -59,6 +59,7 @@ filtering, storage) runs on Mailcow, which the portal drives through its API and
 | Security | Session auth with CSRF, mandatory TOTP 2FA with recovery codes and replay protection, lockout, throttling, RBAC (super admin / operations admin / business admin), strict tenant isolation, full audit log, encrypted TOTP secrets, security headers and CSP. |
 | Portal | React + TypeScript SPA: overview, businesses, domains with a step-by-step setup slip, mailboxes, forwarding, security events, activity log, portal users, plans, mail-server health, account settings. Responsive and keyboard accessible. |
 | Installable app (PWA) | The portal installs to the home screen / desktop (Android, iOS, Windows, macOS, ChromeOS) with its own icon, standalone window, safe-area support and shortcuts to Mailboxes, Domains and Forwarding. The app shell works offline with an offline notice; an in-app bar offers updates. API responses are never cached, so no business data is stored on the device. |
+| Push notifications | Gmail-style Web Push to phones and desktops: new mail (sender, subject, mailbox and business name, logo, grouped as "N new messages", app-icon badge), security events, domain/DNS problems and, for staff, system alerts. Per-user categories and followed mailboxes, per-device on/off, encrypted end to end, subscriptions pruned automatically. Needs VAPID keys and the mail-server hook in [deploy/mailcow/new-mail-hook](deploy/mailcow/new-mail-hook/README.md). |
 | Operations | Docker images, Compose stack, nginx edge with TLS bootstrap and Let's Encrypt renewal, encrypted offsite backups for Mailcow and the app DB, restore script, Mailcow setup guide, CI workflow. |
 
 **Deliberately not built in V1** (per the brief): a custom webmail client, mobile app, calendar/drive, newsletters or marketing mail, billing integration, a custom SMTP server. Mailbox users use SOGo webmail or any IMAP/SMTP/ActiveSync client.
@@ -327,6 +328,8 @@ All endpoints are under `/api/`, JSON in and out, session auth + `X-CSRFToken` h
 | `GET monitoring/reputation/` · `GET monitoring/alerts/` · `POST monitoring/alerts/{id}/acknowledge/` | Staff |
 | `POST monitoring/run/` | `{"job": "health"\|"blacklists"\|"sync"\|"abuse"\|"dns"}`; super admin |
 | `POST monitoring/backup-report/` | `Authorization: Bearer $BACKUP_REPORT_TOKEN`; used by the backup job |
+| `GET notifications/config/` · `GET PATCH notifications/preferences/` · `POST DELETE notifications/subscriptions/` · `POST notifications/test/` | Push settings for the signed-in user; watched mailboxes are limited to the user's own tenant |
+| `POST push/new-mail/` | `Authorization: Bearer $NEW_MAIL_WEBHOOK_TOKEN`; called by the mail server per delivered message (metadata only) |
 
 Outside `/api/`: `GET /healthz` (liveness), `GET /readyz` (DB + cache), `GET /metrics` (Prometheus; allow-listed networks only).
 

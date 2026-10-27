@@ -1071,3 +1071,51 @@ body {
     -webkit-user-select: text;
   }
 }
+
+/* Install-app entry in the menu and mobile top bar */
+.nav-install {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+  background: var(--stamp);
+  color: #fff;
+  border: 0;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-install:hover {
+  background: var(--stamp-hover);
+}
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Notification settings and opt-in banner */
+.push-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.check-group {
+  border: 0;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.check-group legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 600;
+}

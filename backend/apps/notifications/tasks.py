@@ -1,3 +1,4 @@
+import json
 import logging
 
 import requests
@@ -65,4 +66,59 @@ def store_and_deliver_alert(key: str, title: str, message: str, severity: str, b
     alert = _store_alert(key, title, message, severity, business_id)
     if alert is not None:
         deliver_alert.delay(alert.pk)
+        push_alert.delay(alert.pk)
     return alert.pk if alert else None
+
+
+@shared_task(bind=True, max_retries=4)
+def send_push(self, subscription_id: int, payload: dict, urgency: str = "normal"):
+    """Deliver one notification to one device. Gone subscriptions are removed; transient errors retry."""
+    from django.utils import timezone
+    from pywebpush import WebPushException, webpush
+
+    from .models import PushSubscription
+
+    sub = PushSubscription.objects.filter(pk=subscription_id, active=True).first()
+    if sub is None:
+        return "skipped"
+    try:
+        webpush(
+            subscription_info={"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}},
+            data=json.dumps(payload, separators=(",", ":")),
+            vapid_private_key=settings.VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": settings.VAPID_SUBJECT},
+            ttl=settings.PUSH_TTL_SECONDS,
+            headers={"Urgency": urgency if urgency in ("very-low", "low", "normal", "high") else "normal"},
+            timeout=10,
+        )
+    except WebPushException as exc:
+        status = getattr(exc.response, "status_code", None)
+        if status in (404, 410):
+            sub.delete()
+            return "gone"
+        if status is not None and 400 <= status < 500 and status != 429:
+            sub.failure_count += 1
+            sub.active = sub.failure_count < 5
+            sub.save(update_fields=["failure_count", "active"])
+            logger.warning("Push rejected (%s) for subscription %s", status, sub.pk)
+            return "rejected"
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
+    except requests.RequestException as exc:
+        raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
+    PushSubscription.objects.filter(pk=sub.pk).update(last_success_at=timezone.now(), failure_count=0)
+    return "sent"
+
+
+@shared_task
+def push_new_mail(recipient: str, sender: str, subject: str) -> int:
+    from .push import notify_new_mail
+
+    return notify_new_mail(recipient, sender, subject)
+
+
+@shared_task
+def push_alert(alert_id: int) -> int:
+    from .push import notify_alert
+
+    alert = Alert.objects.select_related("business").filter(pk=alert_id).first()
+    return notify_alert(alert) if alert else 0

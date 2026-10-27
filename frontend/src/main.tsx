@@ -15,6 +15,7 @@ import App from "./App";
 import { AuthProvider } from "./auth";
 import { ToastProvider } from "./components/ui";
 import { PwaStatus, registerServiceWorker } from "./pwa";
+import { syncPushSubscription } from "./push";
 
 registerServiceWorker();
 
@@ -32,6 +33,12 @@ const queryClient = new QueryClient({
       void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "me" });
     },
   }),
+});
+
+// Messages from the service worker: refresh data after a push, re-register after the browser rotated keys.
+navigator.serviceWorker?.addEventListener("message", (event: MessageEvent<{ type?: string }>) => {
+  if (event.data?.type === "push") void queryClient.invalidateQueries();
+  if (event.data?.type === "pushsubscriptionchange") void syncPushSubscription();
 });
 
 const root = document.getElementById("root");

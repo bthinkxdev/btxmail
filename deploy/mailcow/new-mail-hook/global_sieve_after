@@ -1,0 +1,12 @@
+require ["vnd.dovecot.execute", "variables", "envelope"];
+
+# Runs after the user's own filters, once per delivered message.
+# Spam never produces a notification (Rspamd sets X-Spam: Yes).
+if header :contains "X-Spam" "Yes" {
+    stop;
+}
+
+if envelope :matches "to" "*" {
+    set "rcpt" "${1}";
+    execute :pipe "notify-portal.sh" ["${rcpt}"];
+}
