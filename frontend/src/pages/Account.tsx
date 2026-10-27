@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { api, ApiError } from "../api";
 import { useAuth, useMe } from "../auth";
+import NotificationSettings from "../components/NotificationSettings";
 import { Badge, errorText, Field, PageHead, useToast } from "../components/ui";
 import { ROLE_LABEL } from "../format";
 import { PasswordChangeForm, RecoveryCodes } from "./Setup";
@@ -71,6 +72,7 @@ export default function Account() {
             <p className="small muted">Lost your phone? Ask a BThinkX administrator to reset your two-factor setup.</p>
           </div>
         </section>
+        <NotificationSettings />
       </div>
     </>
   );

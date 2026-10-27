@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 
 import { api, ApiError, ensureCsrf } from "./api";
+import { disablePush } from "./push";
 import type { Me } from "./types";
 
 interface AuthState {
@@ -35,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      // A signed-out user must stop receiving notifications on this device.
+      await disablePush().catch(() => undefined);
       await api.post("/auth/logout/");
     } finally {
       client.clear();

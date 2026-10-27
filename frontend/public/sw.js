@@ -91,3 +91,116 @@ async function staleWhileRevalidate(req) {
     .catch(() => hit);
   return hit || refresh;
 }
+
+/* ------------------------------------------------------------------ Web Push */
+const ICON = "/icons/icon-192.png";
+const BADGE = "/icons/badge-96.png";
+const MAX_LINES = 5;
+
+self.addEventListener("push", (event) => event.waitUntil(showPush(event)));
+
+async function showPush(event) {
+  let d = {};
+  try {
+    d = event.data ? event.data.json() : {};
+  } catch {
+    d = { title: "BThinkX Mail", body: event.data ? event.data.text() : "" };
+  }
+  const kind = d.kind || "general";
+
+  // Someone is already looking at the portal: let the page refresh itself instead of interrupting.
+  if (kind !== "mail" && kind !== "test") {
+    const open = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const visible = open.filter((c) => c.visibilityState === "visible" && c.focused);
+    if (visible.length) {
+      visible.forEach((c) => c.postMessage({ type: "push", kind }));
+      return;
+    }
+  }
+
+  const tag = d.tag || kind;
+  const footer = [d.account, d.center].filter(Boolean).join(" · ");
+  let title = d.title || "BThinkX Mail";
+  let body = [d.body, footer].filter(Boolean).join("\n");
+  let data = { url: d.url || "/", kind, count: 1, items: [] };
+
+  if (kind === "mail") {
+    // Gmail-style grouping: one notification per mailbox that summarises everything unread.
+    const previous = (await self.registration.getNotifications({ tag }))[0];
+    const prior = previous && previous.data ? previous.data : { count: 0, items: [] };
+    const items = [...prior.items, { sender: d.sender || d.title, subject: d.body }].slice(-MAX_LINES);
+    const count = prior.count + 1;
+    data = { url: d.url || "/", kind, count, items };
+    if (count > 1) {
+      title = count + " new messages";
+      body = items
+        .slice()
+        .reverse()
+        .map((i) => i.sender + ": " + i.subject)
+        .join("\n");
+      if (footer) body += "\n" + footer;
+    }
+  }
+
+  await self.registration.showNotification(title, {
+    body,
+    icon: ICON,
+    badge: BADGE,
+    tag,
+    renotify: true,
+    timestamp: d.ts || Date.now(),
+    lang: "en",
+    requireInteraction: kind === "security",
+    silent: false,
+    data,
+    actions: kind === "mail" ? [{ action: "open", title: "Open inbox" }] : [{ action: "open", title: "Open" }],
+  });
+  await updateBadge();
+}
+
+async function updateBadge() {
+  if (!("setAppBadge" in self.navigator)) return;
+  const shown = await self.registration.getNotifications();
+  const unread = shown.reduce((n, x) => n + (x.data && x.data.kind === "mail" ? x.data.count : 0), 0);
+  try {
+    if (unread > 0) await self.navigator.setAppBadge(unread);
+    else await self.navigator.clearAppBadge();
+  } catch {
+    /* badges are best effort */
+  }
+}
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(openTarget(event.notification.data || {}));
+});
+
+self.addEventListener("notificationclose", (event) => {
+  event.waitUntil(updateBadge());
+});
+
+async function openTarget(data) {
+  const target = new URL(data.url || "/", self.location.origin);
+  if (target.origin === self.location.origin) {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if (new URL(client.url).origin === self.location.origin) {
+        await client.focus();
+        if ("navigate" in client && client.url !== target.href) await client.navigate(target.href).catch(() => undefined);
+        await updateBadge();
+        return;
+      }
+    }
+  }
+  await self.clients.openWindow(target.href);
+  await updateBadge();
+}
+
+// The browser rotated or expired the subscription: tell open pages so they re-register.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((all) => {
+      all.forEach((c) => c.postMessage({ type: "pushsubscriptionchange" }));
+    })
+  );
+});

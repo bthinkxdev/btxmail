@@ -34,7 +34,7 @@ def _store_alert(key, title, message, severity, business_id) -> Alert | None:
 
 
 def raise_alert(key: str, title: str, message: str, *, severity=Alert.Severity.WARNING, business=None) -> Alert | None:
-    from .tasks import deliver_alert, store_and_deliver_alert
+    from .tasks import deliver_alert, push_alert, store_and_deliver_alert
 
     business_id = getattr(business, "pk", None)
     severity = str(severity)
@@ -44,4 +44,5 @@ def raise_alert(key: str, title: str, message: str, *, severity=Alert.Severity.W
     alert = _store_alert(key, title, message, severity, business_id)
     if alert is not None:
         deliver_alert.delay(alert.pk)
+        push_alert.delay(alert.pk)
     return alert

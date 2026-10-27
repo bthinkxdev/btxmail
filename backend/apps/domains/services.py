@@ -248,6 +248,9 @@ def refresh_dns_status(domain: Domain) -> DomainDNSStatus:
         )
         domain.status = Domain.Status.ACTIVE
         audit.record("domain.activated", business=domain.business, obj=domain)
+        from apps.notifications.push import notify_domain_active
+
+        notify_domain_active(domain)
     elif previously_ready and domain.status == Domain.Status.ACTIVE:
         failing = [n for n, r in (("MX", mx), ("SPF", spf), ("DKIM", dkim)) if r.status == dns_checks.FAIL]
         if failing:

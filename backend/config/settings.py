@@ -330,6 +330,23 @@ ALERT_EMAILS = env_list("ALERT_EMAILS")
 ALERT_WEBHOOK_URL = env("ALERT_WEBHOOK_URL", "")
 ALERT_DEDUP_SECONDS = env_int("ALERT_DEDUP_SECONDS", 60 * 60)
 
+# Web Push (generate keys with `python manage.py generate_vapid_keys`)
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = env("VAPID_SUBJECT", f"mailto:{(ALERT_EMAILS or ['admin@bthinkx.com'])[0]}")
+if bool(VAPID_PUBLIC_KEY) != bool(VAPID_PRIVATE_KEY):
+    raise ImproperlyConfigured("Set both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.")
+PUSH_ENDPOINT_ALLOWED_SUFFIXES = env_list(
+    "PUSH_ENDPOINT_ALLOWED_SUFFIXES",
+    "fcm.googleapis.com,android.googleapis.com,push.services.mozilla.com,push.apple.com,notify.windows.com",
+)
+PUSH_TTL_SECONDS = env_int("PUSH_TTL_SECONDS", 24 * 60 * 60)
+PUSH_MAIL_RATE_PER_MINUTE = env_int("PUSH_MAIL_RATE_PER_MINUTE", 30)
+# Shared secret the mail server presents when a message is delivered (see deploy/mailcow/README.md).
+NEW_MAIL_WEBHOOK_TOKEN = env("NEW_MAIL_WEBHOOK_TOKEN", "")
+if NEW_MAIL_WEBHOOK_TOKEN and len(NEW_MAIL_WEBHOOK_TOKEN) < 32:
+    raise ImproperlyConfigured("NEW_MAIL_WEBHOOK_TOKEN must be at least 32 characters.")
+
 # Django admin is break-glass only (no 2FA). Disabled unless ADMIN_URL is set.
 ADMIN_URL = env("ADMIN_URL", "") or ""
 if ADMIN_URL and not ADMIN_URL.endswith("/"):

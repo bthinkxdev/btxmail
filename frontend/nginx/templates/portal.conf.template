@@ -43,6 +43,8 @@ server {
     location = /api/auth/login/otp/  { limit_req zone=auth burst=5 nodelay; include /etc/nginx/conf.d/proxy.inc; }
     location /api/auth/password/     { limit_req zone=auth burst=5 nodelay; include /etc/nginx/conf.d/proxy.inc; }
 
+    location = /api/push/new-mail/ { limit_req zone=mailhook burst=300 nodelay; include /etc/nginx/conf.d/proxy.inc; }
+
     location /api/          { limit_req zone=api burst=40 nodelay; include /etc/nginx/conf.d/proxy.inc; }
     location = /healthz     { include /etc/nginx/conf.d/proxy.inc; }
     location /django-static/ {
