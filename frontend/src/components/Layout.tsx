@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useMe, useAuth } from "../auth";
 import { ROLE_LABEL } from "../format";
+import { useInstall } from "../pwa";
 
 export function Logo({ size = 26 }: { size?: number }) {
   return (
@@ -18,6 +19,7 @@ export default function Layout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const install = useInstall();
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(location.pathname);
   if (lastPath !== location.pathname) {
@@ -61,6 +63,12 @@ export default function Layout() {
         <div className="sidebar-foot">
           <span className="who">{me.full_name || me.email}</span>
           <span>{me.business_name ?? ROLE_LABEL[me.role]}</span>
+          {install.kind === "prompt" && (
+            <button type="button" onClick={install.install}>
+              Install app
+            </button>
+          )}
+          {install.kind === "ios" && <span>To install: tap Share, then “Add to Home Screen”.</span>}
           <button
             onClick={async () => {
               await logout();

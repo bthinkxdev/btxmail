@@ -14,6 +14,9 @@ import { ApiError } from "./api";
 import App from "./App";
 import { AuthProvider } from "./auth";
 import { ToastProvider } from "./components/ui";
+import { PwaStatus, registerServiceWorker } from "./pwa";
+
+registerServiceWorker();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +42,7 @@ createRoot(root).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ToastProvider>
+          <PwaStatus />
           <AuthProvider>
             <App />
           </AuthProvider>
