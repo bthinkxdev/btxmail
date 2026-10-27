@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../api";
 import { useAuth, useMe } from "../auth";
 import NotificationSettings from "../components/NotificationSettings";
-import { Badge, errorText, Field, PageHead, useToast } from "../components/ui";
+import { Badge, errorText, Field, PageHead, PasswordInput, useToast } from "../components/ui";
 import { ROLE_LABEL } from "../format";
 import { PasswordChangeForm, RecoveryCodes } from "./Setup";
 
@@ -61,7 +61,7 @@ export default function Account() {
                 </p>
                 {err && <div className="notice bad">{err}</div>}
                 <Field label="Confirm with your password">
-                  {(id) => <input id={id} type="password" autoComplete="current-password" value={password}
+                  {(id) => <PasswordInput id={id} autoComplete="current-password" value={password}
                                   onChange={(e) => setPassword(e.target.value)} required />}
                 </Field>
                 <button className="btn" disabled={busy || !password}>

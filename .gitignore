@@ -11,3 +11,7 @@ frontend/dist/
 *.log
 .DS_Store
 frontend/*.tsbuildinfo
+
+# secrets
+*.pem
+*.key
