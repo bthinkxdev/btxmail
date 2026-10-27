@@ -120,45 +120,50 @@ def create_mailbox(
     local = normalize_local_part(local_part)
     address = f"{local}@{domain.name}"
     password = generate_password()
-    remote_created = False
     client = get_client()
 
+    # 1. Reserve the slot under the business lock. The PENDING row counts toward every
+    #    quota check, so the lock is released before the (slow) Mailcow calls.
+    with transaction.atomic():
+        business = _lock_business(business)
+        _require_mail_domain(domain, business)
+        plan = business.plan
+        if business.mailboxes.exclude(status=Mailbox.Status.DELETING).count() >= plan.max_mailboxes:
+            raise QuotaExceeded(f"Your plan allows at most {plan.max_mailboxes} mailboxes.")
+        quota = quota_mb if quota_mb is not None else min(plan.default_mailbox_quota_mb, plan.max_mailbox_quota_mb)
+        _validate_quota(business, quota)
+        if _address_taken(address):
+            raise Conflict(f"{address} is already in use.")
+        mailbox = Mailbox.objects.create(
+            business=business,
+            domain=domain,
+            local_part=local,
+            email=address,
+            display_name=(display_name or "").strip()[:200],
+            quota_mb=quota,
+            status=Mailbox.Status.PENDING,
+        )
+
+    # 2. Create it on Mailcow (no database lock held).
+    remote_created = False
     try:
-        with transaction.atomic():
-            business = _lock_business(business)
-            _require_mail_domain(domain, business)
-            plan = business.plan
-            if business.mailboxes.exclude(status=Mailbox.Status.DELETING).count() >= plan.max_mailboxes:
-                raise QuotaExceeded(f"Your plan allows at most {plan.max_mailboxes} mailboxes.")
-            quota = quota_mb if quota_mb is not None else min(plan.default_mailbox_quota_mb, plan.max_mailbox_quota_mb)
-            _validate_quota(business, quota)
-            if _address_taken(address):
-                raise Conflict(f"{address} is already in use.")
-
-            mailbox = Mailbox.objects.create(
-                business=business,
-                domain=domain,
+        try:
+            mc_mailboxes.create_mailbox(
                 local_part=local,
-                email=address,
-                display_name=(display_name or "").strip()[:200],
+                domain=domain.name,
+                name=mailbox.display_name or local,
                 quota_mb=quota,
-                status=Mailbox.Status.PENDING,
+                password=password,
+                force_password_change=True,
+                client=client,
             )
-            try:
-                mc_mailboxes.create_mailbox(
-                    local_part=local,
-                    domain=domain.name,
-                    name=mailbox.display_name or local,
-                    quota_mb=quota,
-                    password=password,
-                    force_password_change=True,
-                    client=client,
-                )
-                remote_created = True
-                mc_mailboxes.set_rate_limit(address, mailbox.effective_hourly_limit(), client)
-            except MailcowError as exc:
-                raise_conflict_or_reraise(exc, f"{address} already exists on the mail server.")
+            remote_created = True
+            mc_mailboxes.set_rate_limit(address, mailbox.effective_hourly_limit(), client)
+        except MailcowError as exc:
+            raise_conflict_or_reraise(exc, f"{address} already exists on the mail server.")
 
+        # 3. Finalise.
+        with transaction.atomic():
             mailbox.status = Mailbox.Status.ACTIVE
             mailbox.mailcow_id = address
             mailbox.save(update_fields=["status", "mailcow_id", "updated_at"])
@@ -173,6 +178,7 @@ def create_mailbox(
     except Exception:
         if remote_created:
             _compensate_mailbox_create(address)
+        Mailbox.objects.filter(pk=mailbox.pk, status=Mailbox.Status.PENDING).delete()
         raise
     return mailbox, password
 
@@ -203,13 +209,17 @@ def update_mailbox(
     outbound_limit_per_day=None,
     limits_supplied=False,
 ) -> Mailbox:
-    attrs, changes = {}, {}
+    attrs, changes, previous = {}, {}, {}
+    rate_changed = False
+    # Validate and persist under the lock; the Mailcow calls happen after it is released
+    # and the previous values are restored if they fail.
     with transaction.atomic():
         business = _lock_business(mailbox.business)
         mailbox = Mailbox.objects.select_for_update().get(pk=mailbox.pk)
         if mailbox.status in (Mailbox.Status.PENDING, Mailbox.Status.DELETING, Mailbox.Status.FAILED):
             raise ServiceError("This mailbox cannot be edited in its current state.")
         if display_name is not None and display_name.strip() != mailbox.display_name:
+            previous["display_name"] = mailbox.display_name
             mailbox.display_name = display_name.strip()[:200]
             attrs["name"] = mailbox.display_name or mailbox.local_part
             changes["display_name"] = mailbox.display_name
@@ -217,27 +227,34 @@ def update_mailbox(
             _validate_quota(business, quota_mb, exclude_mailbox_id=mailbox.pk)
             if quota_mb * 1024 * 1024 < mailbox.used_bytes:
                 raise ServiceError("New quota is smaller than the storage already used.")
+            previous["quota_mb"] = mailbox.quota_mb
             mailbox.quota_mb = quota_mb
             attrs["quota"] = str(quota_mb)
             changes["quota_mb"] = quota_mb
-        rate_changed = False
         if limits_supplied:
             if outbound_limit_per_hour != mailbox.outbound_limit_per_hour:
+                previous["outbound_limit_per_hour"] = mailbox.outbound_limit_per_hour
                 mailbox.outbound_limit_per_hour = outbound_limit_per_hour
                 rate_changed = True
                 changes["outbound_limit_per_hour"] = outbound_limit_per_hour
             if outbound_limit_per_day != mailbox.outbound_limit_per_day:
+                previous["outbound_limit_per_day"] = mailbox.outbound_limit_per_day
                 mailbox.outbound_limit_per_day = outbound_limit_per_day
                 changes["outbound_limit_per_day"] = outbound_limit_per_day
         if not changes:
             return mailbox
-        client = get_client()
+        mailbox.save()
+
+    client = get_client()
+    try:
         if attrs:
             mc_mailboxes.edit_mailbox(mailbox.email, attrs, client)
         if rate_changed:
             mc_mailboxes.set_rate_limit(mailbox.email, mailbox.effective_hourly_limit(), client)
-        mailbox.save()
-        audit.record("mailbox.updated", actor=actor, request=request, business=business, obj=mailbox, metadata=changes)
+    except MailcowError:
+        Mailbox.objects.filter(pk=mailbox.pk).update(**previous)
+        raise
+    audit.record("mailbox.updated", actor=actor, request=request, business=business, obj=mailbox, metadata=changes)
     return mailbox
 
 
@@ -377,20 +394,22 @@ def create_alias(
     dests = normalize_destinations(destinations)
     if address in dests:
         raise ServiceError("An alias cannot forward to itself.")
+    with transaction.atomic():
+        business = _lock_business(business)
+        _require_mail_domain(domain, business)
+        if business.aliases.count() >= business.plan.max_aliases:
+            raise QuotaExceeded(f"Your plan allows at most {business.plan.max_aliases} aliases.")
+        if _address_taken(address):
+            raise Conflict(f"{address} is already in use.")
+        alias = Alias.objects.create(business=business, domain=domain, source_address=address, destinations=dests)
+
     remote_id = None
     try:
+        try:
+            remote_id = mc_aliases.create_alias(address, dests)
+        except MailcowError as exc:
+            raise_conflict_or_reraise(exc, f"{address} already exists on the mail server.")
         with transaction.atomic():
-            business = _lock_business(business)
-            _require_mail_domain(domain, business)
-            if business.aliases.count() >= business.plan.max_aliases:
-                raise QuotaExceeded(f"Your plan allows at most {business.plan.max_aliases} aliases.")
-            if _address_taken(address):
-                raise Conflict(f"{address} is already in use.")
-            alias = Alias.objects.create(business=business, domain=domain, source_address=address, destinations=dests)
-            try:
-                remote_id = mc_aliases.create_alias(address, dests)
-            except MailcowError as exc:
-                raise_conflict_or_reraise(exc, f"{address} already exists on the mail server.")
             alias.mailcow_id = remote_id
             alias.save(update_fields=["mailcow_id", "updated_at"])
             audit.record(
@@ -407,6 +426,7 @@ def create_alias(
                 mc_aliases.delete_alias(remote_id)
             except MailcowError:
                 logger.exception("Failed to roll back alias %s", address)
+        Alias.objects.filter(pk=alias.pk).delete()
         raise
     return alias
 
@@ -423,8 +443,18 @@ def update_alias(alias: Alias, *, actor, request=None, destinations=None, status
             if status not in Alias.Status.values:
                 raise ServiceError("Invalid status.")
             alias.status = status
+        before = Alias.objects.get(pk=alias.pk)
         mc_aliases.update_alias(alias.mailcow_id, alias.destinations, active=alias.status == Alias.Status.ACTIVE)
-        alias.save()
+        try:
+            alias.save()
+        except Exception:
+            try:
+                mc_aliases.update_alias(
+                    alias.mailcow_id, before.destinations, active=before.status == Alias.Status.ACTIVE
+                )
+            except MailcowError:
+                logger.exception("Failed to roll back alias %s", alias.source_address)
+            raise
         audit.record(
             "alias.updated",
             actor=actor,
@@ -437,7 +467,10 @@ def update_alias(alias: Alias, *, actor, request=None, destinations=None, status
 
 
 def delete_alias(alias: Alias, *, actor, request=None) -> None:
-    mc_aliases.delete_alias(alias.mailcow_id)
-    business, address = alias.business, alias.source_address
-    alias.delete()
-    audit.record("alias.deleted", actor=actor, request=request, business=business, metadata={"address": address})
+    with transaction.atomic():
+        alias = Alias.objects.select_for_update().select_related("business").get(pk=alias.pk)
+        if alias.mailcow_id:
+            mc_aliases.delete_alias(alias.mailcow_id)
+        business, address = alias.business, alias.source_address
+        alias.delete()
+        audit.record("alias.deleted", actor=actor, request=request, business=business, metadata={"address": address})
