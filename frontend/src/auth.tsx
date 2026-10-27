@@ -36,13 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      // A signed-out user must stop receiving notifications on this device.
-      await disablePush().catch(() => undefined);
+      // A signed-out user must stop receiving notifications on this device. This is best effort and
+      // time-limited: navigator.serviceWorker.ready never resolves without an active worker, and that
+      // must not stop the user from signing out.
+      await Promise.race([disablePush().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3000))]);
       await api.post("/auth/logout/");
+    } catch {
+      /* the local session is cleared below regardless; an expired session is already signed out */
     } finally {
       client.clear();
       client.setQueryData(["me"], null);
-      await ensureCsrf(true);
+      await ensureCsrf(true).catch(() => undefined);
     }
   }, [client]);
 
