@@ -1,3 +1,5 @@
+import { plainText } from "./format";
+
 /**
  * Thin fetch wrapper for the Django API.
  * - Same-origin session cookie; CSRF token read from the `btx_csrftoken` cookie.
@@ -92,7 +94,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
         : response.status >= 500
           ? "The server could not complete the request."
           : "The request was not accepted.";
-    const err = new ApiError(response.status, d.detail || fallback, d.code || "error", d.errors, d.request_id);
+    const err = new ApiError(response.status, plainText(d.detail || fallback), d.code || "error", d.errors, d.request_id);
     if (response.status === 403 && (d.code === "not_authenticated" || d.detail?.includes("credentials"))) {
       window.dispatchEvent(new CustomEvent("btx:unauthenticated"));
     }

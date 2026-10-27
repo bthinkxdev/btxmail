@@ -1119,3 +1119,9 @@ body {
   margin-bottom: 4px;
   font-weight: 600;
 }
+
+.logo-mark {
+  display: block;
+  flex: none;
+  border-radius: 22%;
+}

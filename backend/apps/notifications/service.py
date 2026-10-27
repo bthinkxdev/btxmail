@@ -10,6 +10,7 @@ not lost with the rollback.
 """
 
 import logging
+import re
 from datetime import timedelta
 
 from django.conf import settings
@@ -21,7 +22,13 @@ from .models import Alert
 logger = logging.getLogger(__name__)
 
 
+def _plain(text: str) -> str:
+    """Alerts reach people outside the ops team (push, portal); do not expose the mail software name."""
+    return re.sub(r"mailcow", "mail server", re.sub(r"-mailcow", "", text, flags=re.I), flags=re.I)
+
+
 def _store_alert(key, title, message, severity, business_id) -> Alert | None:
+    title, message = _plain(title), _plain(message)
     window_start = timezone.now() - timedelta(seconds=settings.ALERT_DEDUP_SECONDS)
     if Alert.objects.filter(key=key, created_at__gte=window_start).exists():
         logger.info("Alert %s suppressed (dedup window)", key)
