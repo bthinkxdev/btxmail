@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import timedelta
 
 from celery import shared_task
 from django.core.cache import cache
@@ -61,8 +62,19 @@ def sync_mailcow() -> dict:
             if parsed["username"]:
                 remote[parsed["username"]] = parsed
 
-        known_emails = set(Mailbox.objects.values_list("email", flat=True))
         now = timezone.now()
+
+        # A worker that died mid-provisioning leaves a PENDING reservation behind. Finish it if
+        # the mailbox exists on Mailcow, otherwise release the quota it holds.
+        for stale in Mailbox.objects.filter(
+            status=Mailbox.Status.PENDING, updated_at__lt=now - timedelta(seconds=IMPORT_GRACE_SECONDS)
+        ):
+            if stale.email.lower() in remote:
+                Mailbox.objects.filter(pk=stale.pk).update(status=Mailbox.Status.ACTIVE, mailcow_id=stale.email)
+            else:
+                stale.delete()
+
+        known_emails = set(Mailbox.objects.values_list("email", flat=True))
 
         for mailbox in Mailbox.objects.exclude(
             status__in=[Mailbox.Status.PENDING, Mailbox.Status.DELETING]

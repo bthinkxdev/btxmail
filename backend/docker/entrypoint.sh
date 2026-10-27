@@ -39,7 +39,7 @@ case "$role" in
       --timeout "${GUNICORN_TIMEOUT:-60}" \
       --graceful-timeout 30 \
       --max-requests 2000 --max-requests-jitter 200 \
-      --forwarded-allow-ips "*" \
+      --forwarded-allow-ips "${GUNICORN_FORWARDED_ALLOW_IPS:-*}" \
       --access-logfile - --error-logfile -
     ;;
   worker)
