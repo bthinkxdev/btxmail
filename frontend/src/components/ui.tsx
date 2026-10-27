@@ -6,6 +6,7 @@ import {
   useId,
   useRef,
   useState,
+  type InputHTMLAttributes,
   type ReactNode,
 } from "react";
 
@@ -186,6 +187,29 @@ export function Field({ label, hint, error, children, id }: {
         </span>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ password input */
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [shown, setShown] = useState(false);
+  return (
+    <span className="pw-wrap">
+      <input {...props} type={shown ? "text" : "password"} />
+      <button
+        type="button"
+        className="pw-toggle"
+        onClick={() => setShown((v) => !v)}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
+          <circle cx="12" cy="12" r="3" />
+          {shown && <path d="M3 3l18 18" />}
+        </svg>
+      </button>
+    </span>
   );
 }
 

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api, ApiError } from "../api";
-import { errorText, Field } from "../components/ui";
+import { errorText, Field, PasswordInput } from "../components/ui";
 import { AuthFrame } from "./Login";
 
 export default function ResetPassword() {
@@ -74,13 +74,13 @@ export default function ResetPassword() {
           {error && <div className="notice bad">{error}</div>}
           <Field label="New password" error={fieldError}>
             {(id) => (
-              <input id={id} type="password" autoComplete="new-password" required minLength={12} value={password}
+              <PasswordInput id={id} autoComplete="new-password" required minLength={12} value={password}
                      onChange={(e) => setPassword(e.target.value)} />
             )}
           </Field>
           <Field label="Repeat new password">
             {(id) => (
-              <input id={id} type="password" autoComplete="new-password" required value={confirm}
+              <PasswordInput id={id} autoComplete="new-password" required value={confirm}
                      onChange={(e) => setConfirm(e.target.value)} />
             )}
           </Field>

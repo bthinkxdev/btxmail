@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { api, ApiError } from "../api";
 import { useAuth } from "../auth";
-import { CopyButton, errorText, Field, Loading } from "../components/ui";
+import { CopyButton, errorText, Field, Loading, PasswordInput } from "../components/ui";
 import type { Me } from "../types";
 import { AuthFrame } from "./Login";
 
@@ -43,15 +43,15 @@ export function PasswordChangeForm({ onDone }: { onDone: (me: Me) => void }) {
         <div className="notice bad">{err.summary}</div>
       )}
       <Field label="Current password" error={err?.field("current_password")}>
-        {(id) => <input id={id} type="password" autoComplete="current-password" value={current}
+        {(id) => <PasswordInput id={id} autoComplete="current-password" value={current}
                         onChange={(e) => setCurrent(e.target.value)} required />}
       </Field>
       <Field label="New password" hint="At least 12 characters, not a common password." error={err?.field("new_password")}>
-        {(id) => <input id={id} type="password" autoComplete="new-password" value={next}
+        {(id) => <PasswordInput id={id} autoComplete="new-password" value={next}
                         onChange={(e) => setNext(e.target.value)} required minLength={12} />}
       </Field>
       <Field label="Repeat new password" error={mismatch ? "The two passwords do not match." : undefined}>
-        {(id) => <input id={id} type="password" autoComplete="new-password" value={repeat}
+        {(id) => <PasswordInput id={id} autoComplete="new-password" value={repeat}
                         onChange={(e) => setRepeat(e.target.value)} required />}
       </Field>
       <button className="btn primary" disabled={busy || !current || next.length < 12}>

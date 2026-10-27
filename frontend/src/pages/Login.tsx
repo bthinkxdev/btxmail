@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useAuth } from "../auth";
 import { Logo } from "../components/Layout";
-import { errorText, Field } from "../components/ui";
+import { errorText, Field, PasswordInput } from "../components/ui";
 import type { Me } from "../types";
 
 export function AuthFrame({ children }: { children: ReactNode }) {
@@ -107,7 +107,7 @@ export default function Login() {
           </Field>
           <Field label="Password">
             {(id) => (
-              <input id={id} type="password" autoComplete="current-password" required value={password}
+              <PasswordInput id={id} autoComplete="current-password" required value={password}
                      onChange={(e) => setPassword(e.target.value)} />
             )}
           </Field>
