@@ -1,4 +1,4 @@
-.PHONY: help dev-backend dev-frontend test lint build up down logs migrate shell createsuperuser check-mailcow
+.PHONY: deploy help dev-backend dev-frontend test lint build up down logs migrate shell createsuperuser check-mailcow
 
 help:
 	@echo "dev-backend     Run Django on :8000 with SQLite (DEBUG)"
@@ -6,6 +6,7 @@ help:
 	@echo "test            Backend tests + frontend type-check and build"
 	@echo "lint            ruff lint/format check"
 	@echo "up / down       Start / stop the production stack (docker compose)"
+	@echo "deploy          Deploy origin/main to production over SSH (./deploy.sh)"
 	@echo "logs            Follow container logs"
 	@echo "migrate         Apply database migrations in the running stack"
 	@echo "check-mailcow   Verify the Mailcow API connection from the stack"
@@ -48,3 +49,6 @@ createsuperuser:
 
 check-mailcow:
 	docker compose exec backend python manage.py check_mailcow
+
+deploy:
+	./deploy.sh
