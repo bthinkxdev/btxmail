@@ -23,6 +23,11 @@ class Plan(TimeStampedModel):
     )
     outbound_per_hour = models.PositiveIntegerField(default=100, validators=[MinValueValidator(1)])
     outbound_per_day = models.PositiveIntegerField(default=500, validators=[MinValueValidator(1)])
+    price_monthly = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)],
+        help_text="Price per month; 0 means free. Informational: billing is handled outside the platform.",
+    )
+    currency = models.CharField(max_length=3, default="INR", help_text="ISO 4217 code, e.g. INR, USD.")
     is_active = models.BooleanField(default=True)
 
     class Meta:

@@ -3,11 +3,14 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../api";
 import { useMe } from "../auth";
 import { Badge, Dialog, Empty, ErrorNotice, Field, Loading, PageHead } from "../components/ui";
-import { formatMb } from "../format";
+import { formatMb, formatPrice } from "../format";
 import { useAction, useApiGet } from "../hooks";
 import type { Page, Plan } from "../types";
 
 type PlanForm = Omit<Plan, "id">;
+
+const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "AED", "SGD"];
+
 
 const BLANK: PlanForm = {
   code: "",
@@ -21,6 +24,8 @@ const BLANK: PlanForm = {
   total_storage_mb: 51200,
   outbound_per_hour: 100,
   outbound_per_day: 500,
+  price_monthly: "0",
+  currency: "INR",
   is_active: true,
 };
 
@@ -76,6 +81,21 @@ function PlanDialog({ plan, onClose }: { plan?: Plan; onClose: () => void }) {
           {(id) => <input id={id} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />}
         </Field>
         <div className="form-row">
+          <Field label="Price per month" hint="0 = free. Shown for reference; billing happens outside the platform." error={err?.field("price_monthly")}>
+            {(id) => (
+              <input id={id} type="number" min={0} step="0.01" value={form.price_monthly}
+                     onChange={(e) => setForm({ ...form, price_monthly: e.target.value })} required />
+            )}
+          </Field>
+          <Field label="Currency" error={err?.field("currency")}>
+            {(id) => (
+              <select id={id} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+          </Field>
+        </div>
+        <div className="form-row">
           {NUMBER_FIELDS.map(([key, label, hint]) => (
             <Field key={key} label={label} hint={hint} error={err?.field(key)}>
               {(id) => (
@@ -117,6 +137,7 @@ export default function Plans() {
               <thead>
                 <tr>
                   <th>Plan</th>
+                  <th className="num">Price</th>
                   <th className="num">Domains</th>
                   <th className="num">Mailboxes</th>
                   <th className="num">Per mailbox</th>
@@ -131,6 +152,7 @@ export default function Plans() {
                 {plans.data.results.map((p) => (
                   <tr key={p.id}>
                     <td><strong>{p.name}</strong><div className="muted small">{p.description}</div></td>
+                    <td className="num">{formatPrice(p.price_monthly, p.currency)}</td>
                     <td className="num">{p.max_domains}</td>
                     <td className="num">{p.max_mailboxes}</td>
                     <td className="num">{formatMb(p.max_mailbox_quota_mb)}</td>

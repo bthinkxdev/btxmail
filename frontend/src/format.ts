@@ -60,3 +60,13 @@ export function plainText(text: string): string {
     .replace(/-mailcow/gi, "")
     .replace(/mailcow/gi, "mail server");
 }
+
+export function formatPrice(amount: string | number, currency: string): string {
+  const n = Number(amount);
+  if (!n) return "Free";
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n) + " / month";
+  } catch {
+    return `${n} ${currency} / month`;
+  }
+}

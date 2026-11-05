@@ -20,11 +20,19 @@ class PlanSerializer(serializers.ModelSerializer):
             "total_storage_mb",
             "outbound_per_hour",
             "outbound_per_day",
+            "price_monthly",
+            "currency",
             "is_active",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_currency(self, value):
+        value = value.strip().upper()
+        if len(value) != 3 or not value.isalpha():
+            raise serializers.ValidationError("Use a 3-letter currency code such as INR or USD.")
+        return value
 
     def validate(self, attrs):
         get = lambda k: attrs.get(k, getattr(self.instance, k, None))  # noqa: E731

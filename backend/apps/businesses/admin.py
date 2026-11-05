@@ -14,6 +14,8 @@ class PlanAdmin(admin.ModelAdmin):
         "total_storage_mb",
         "outbound_per_hour",
         "outbound_per_day",
+        "price_monthly",
+        "currency",
         "is_active",
     )
 

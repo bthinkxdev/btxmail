@@ -41,6 +41,8 @@ export interface Plan {
   total_storage_mb: number;
   outbound_per_hour: number;
   outbound_per_day: number;
+  price_monthly: string;
+  currency: string;
   is_active: boolean;
 }
 

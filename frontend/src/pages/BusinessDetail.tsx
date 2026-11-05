@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { api, ApiError } from "../api";
 import { Badge, Confirm, Dialog, Empty, ErrorNotice, Field, Loading, Meter, PageHead } from "../components/ui";
-import { formatBytes, formatDate, formatMb } from "../format";
+import { formatBytes, formatDate, formatMb, formatPrice } from "../format";
 import { useAction, useApiGet } from "../hooks";
 import type { Business, Domain, Page, Plan } from "../types";
 import { BusinessFields, type BusinessForm } from "./Businesses";
@@ -138,6 +138,7 @@ export default function BusinessDetail() {
               <dt>Status</dt><dd><Badge value={b.status} /></dd>
               <dt>Plan</dt><dd>{plan.name}</dd>
               <dt>Per mailbox</dt><dd>up to {formatMb(plan.max_mailbox_quota_mb)}</dd>
+              <dt>Price</dt><dd>{formatPrice(plan.price_monthly, plan.currency)}</dd>
               <dt>Sending limit</dt><dd>{plan.outbound_per_hour}/hour, {plan.outbound_per_day}/day per mailbox</dd>
               <dt>Contact</dt><dd>{b.contact_person || "—"}<br />{b.contact_email}<br />{b.contact_phone}</dd>
               <dt>Customer since</dt><dd>{formatDate(b.created_at)}</dd>
