@@ -7,6 +7,9 @@ import { Logo } from "../components/Layout";
 import { errorText, Field, PasswordInput } from "../components/ui";
 import type { Me } from "../types";
 
+// Mailbox users read mail here; the address is not known before sign-in, so it is fixed at build time.
+const WEBMAIL_URL = "https://btxmail.bthinkx.com/SOGo";
+
 export function AuthFrame({ children }: { children: ReactNode }) {
   return (
     <div className="auth">
@@ -15,8 +18,8 @@ export function AuthFrame({ children }: { children: ReactNode }) {
           <Logo /> BThinkX Mail
         </div>
         <div>
-          <h1>Business email, sorted and delivered.</h1>
-          <p>Manage domains, mailboxes and forwarding for your organisation. Reading mail? Use webmail instead.</p>
+          <h1>Professional email for your business.</h1>
+          <p>Your own domain, secure mailboxes and spam protection, managed in one place.</p>
         </div>
         <div className="bigmark" aria-hidden="true">
           BTHINKX
@@ -91,8 +94,8 @@ export default function Login() {
       {step === "password" ? (
         <form className="form" onSubmit={submitPassword} noValidate>
           <div>
-            <h2>Sign in to the admin portal</h2>
-            <p className="sub">For BThinkX staff and business administrators.</p>
+            <h2>Sign in</h2>
+            <p className="sub">to continue to BThinkX Mail</p>
           </div>
           {error && (
             <div className="notice bad" role="alert">
@@ -117,6 +120,10 @@ export default function Login() {
           <Link to="/reset-password" className="small">
             Forgot your password?
           </Link>
+          <p className="small">
+            Looking for your inbox?{" "}
+            <a href={WEBMAIL_URL}>Open webmail</a>
+          </p>
         </form>
       ) : (
         <form className="form" onSubmit={submitCode} noValidate>
