@@ -7,13 +7,13 @@
 #   ./deploy.sh backend web     rebuild/restart only the named services
 #
 # Overrides (environment):
-#   DEPLOY_HOST=ubuntu@16.176.104.237   DEPLOY_KEY=./btxmail.pem   APP_DIR=/opt/btxmail   BRANCH=main
+#   DEPLOY_HOST=ubuntu@13.54.160.6   DEPLOY_KEY=./btxmail.pem   APP_DIR=/opt/btxmail   BRANCH=main
 # The server keeps its own .env (never in git) and docker-compose.override.yml
 # (template: deploy/server/docker-compose.override.yml, installed on first deploy).
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
-HOST=${DEPLOY_HOST:-ubuntu@16.176.104.237}
+HOST=${DEPLOY_HOST:-ubuntu@13.54.160.6}
 KEY=${DEPLOY_KEY:-./btxmail.pem}
 APP_DIR=${APP_DIR:-/opt/btxmail}
 BRANCH=${BRANCH:-main}
