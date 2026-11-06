@@ -37,7 +37,7 @@
   // "Install app" chip (Chrome/Edge/Android). Remembers a dismissal on this device.
   var deferred = null;
   var KEY = "btxInstallDismissed";
-  function dismissed() { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } }
+  function dismissed() { try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; } }
   function standalone() {
     return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   }
@@ -71,7 +71,7 @@
     };
     no.onclick = function () {
       box.remove();
-      try { localStorage.setItem(KEY, "1"); } catch (e2) { /* ignore */ }
+      try { sessionStorage.setItem(KEY, "1"); } catch (e2) { /* ignore */ }
     };
     box.appendChild(label);
     box.appendChild(go);
@@ -95,6 +95,8 @@
 
   function read(key) { try { return Number(localStorage.getItem(key)) || 0; } catch (e) { return 0; } }
   function write(key) { try { localStorage.setItem(key, String(Date.now())); } catch (e) { /* ignore */ } }
+  function dismissedNow() { try { return sessionStorage.getItem(DISMISS_KEY) === "1"; } catch (e) { return false; } }
+  function dismissNow() { try { sessionStorage.setItem(DISMISS_KEY, "1"); } catch (e) { /* ignore */ } }
   function standalone() {
     return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   }
@@ -162,7 +164,7 @@
       try {
         var permission = await Notification.requestPermission();
         if (permission !== "granted") {
-          write(DISMISS_KEY);
+          dismissNow();
           toast("Notifications are blocked. Allow them in your browser settings to turn them on.");
           return;
         }
@@ -172,7 +174,7 @@
         toast("Could not turn on notifications. Please try again later.");
       }
     };
-    no.onclick = function () { box.remove(); write(DISMISS_KEY); };
+    no.onclick = function () { box.remove(); dismissNow(); };
     box.appendChild(label);
     box.appendChild(go);
     box.appendChild(no);
@@ -182,7 +184,7 @@
   // iPhone/iPad only deliver notifications to an app added to the Home Screen.
   function iosHint() {
     var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (!ios || standalone() || Date.now() - read(DISMISS_KEY) < 14 * DAY) return;
+    if (!ios || standalone() || dismissedNow()) return;
     var box = document.createElement("div");
     box.setAttribute("role", "region");
     box.style.cssText = chipCss(72);
@@ -190,7 +192,7 @@
     label.textContent = "For new-mail notifications: tap Share, then Add to Home Screen.";
     var no = button("✕", false);
     no.setAttribute("aria-label", "Dismiss");
-    no.onclick = function () { box.remove(); write(DISMISS_KEY); };
+    no.onclick = function () { box.remove(); dismissNow(); };
     box.appendChild(label);
     box.appendChild(no);
     document.body.appendChild(box);
@@ -212,7 +214,7 @@
       if (!sub || Date.now() - read(SYNC_KEY) > DAY) await subscribe(cfg, reg);
       return;
     }
-    if (Notification.permission === "denied" || Date.now() - read(DISMISS_KEY) < 14 * DAY) return;
+    if (Notification.permission === "denied" || dismissedNow()) return;
     ask(cfg, reg);
   }
 
