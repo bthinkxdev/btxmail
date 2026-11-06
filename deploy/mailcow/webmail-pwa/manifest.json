@@ -1,0 +1,21 @@
+{
+  "id": "/SOGo/",
+  "name": "BThinkX Mail",
+  "short_name": "BThinkX Mail",
+  "description": "Your BThinkX business inbox.",
+  "start_url": "/SOGo/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "communication"],
+  "icons": [
+    { "src": "/img/bthinkx/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/bthinkx/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/bthinkx/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
