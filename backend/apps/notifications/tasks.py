@@ -71,14 +71,15 @@ def store_and_deliver_alert(key: str, title: str, message: str, severity: str, b
 
 
 @shared_task(bind=True, max_retries=4)
-def send_push(self, subscription_id: int, payload: dict, urgency: str = "normal"):
+def send_push(self, subscription_id: int, payload: dict, urgency: str = "normal", inbox: bool = False):
     """Deliver one notification to one device. Gone subscriptions are removed; transient errors retry."""
     from django.utils import timezone
     from pywebpush import WebPushException, webpush
 
-    from .models import PushSubscription
+    from .models import InboxPushSubscription, PushSubscription
 
-    sub = PushSubscription.objects.filter(pk=subscription_id, active=True).first()
+    model = InboxPushSubscription if inbox else PushSubscription
+    sub = model.objects.filter(pk=subscription_id, active=True).first()
     if sub is None:
         return "skipped"
     try:
@@ -105,15 +106,15 @@ def send_push(self, subscription_id: int, payload: dict, urgency: str = "normal"
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
     except requests.RequestException as exc:
         raise self.retry(exc=exc, countdown=min(30 * 2**self.request.retries, 600)) from exc
-    PushSubscription.objects.filter(pk=sub.pk).update(last_success_at=timezone.now(), failure_count=0)
+    model.objects.filter(pk=sub.pk).update(last_success_at=timezone.now(), failure_count=0)
     return "sent"
 
 
 @shared_task
-def push_new_mail(recipient: str, sender: str, subject: str) -> int:
+def push_new_mail(recipient: str, sender: str, subject: str, preview: str = "") -> int:
     from .push import notify_new_mail
 
-    return notify_new_mail(recipient, sender, subject)
+    return notify_new_mail(recipient, sender, subject, preview)
 
 
 @shared_task

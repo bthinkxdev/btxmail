@@ -53,6 +53,10 @@ api_patterns = [
     path("notifications/subscriptions/", notification_views.SubscriptionView.as_view(), name="push-subscriptions"),
     path("notifications/test/", notification_views.TestPushView.as_view(), name="push-test"),
     path("push/new-mail/", notification_views.NewMailHookView.as_view(), name="push-new-mail"),
+    path("push/new-mail-raw/", notification_views.NewMailRawHookView.as_view(), name="push-new-mail-raw"),
+    path("push/inbox/config/", notification_views.InboxConfigView.as_view(), name="push-inbox-config"),
+    path("push/inbox/subscribe/", notification_views.InboxSubscribeView.as_view(), name="push-inbox-subscribe"),
+    path("push/inbox/unsubscribe/", notification_views.InboxUnsubscribeView.as_view(), name="push-inbox-unsubscribe"),
     path("", include(router.urls)),
 ]
 

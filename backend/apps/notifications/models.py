@@ -47,6 +47,29 @@ class PushSubscription(models.Model):
         return f"{self.user_id}:{self.endpoint[:40]}"
 
 
+class InboxPushSubscription(models.Model):
+    """
+    A device registered for new-mail push by someone who only uses webmail (no portal account).
+    Proven by the mail server's own login session, so it is tied to the mailbox, not to a portal user.
+    """
+
+    mailbox = models.ForeignKey("mailboxes.Mailbox", on_delete=models.CASCADE, related_name="inbox_push_subscriptions")
+    endpoint = models.URLField(max_length=700, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    user_agent = models.CharField(max_length=300, blank=True)
+    active = models.BooleanField(default=True)
+    failure_count = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"inbox:{self.mailbox_id}:{self.endpoint[:40]}"
+
+
 class NotificationPreference(models.Model):
     """Per-user opt-outs by category. A missing row means everything is on."""
 

@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import logging
 import re
+from email import message_from_bytes, policy
 from email.header import decode_header, make_header
 from email.utils import parseaddr
+from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -22,7 +24,7 @@ from django.utils import timezone
 
 from apps.accounts.models import PLATFORM_ROLES, Role, User
 
-from .models import MailWatch, PushSubscription
+from .models import InboxPushSubscription, MailWatch, PushSubscription
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +43,7 @@ def endpoint_allowed(url: str) -> bool:
         return False
     host = parsed.hostname.lower()
     return any(
-        host == s.lstrip(".") or host.endswith("." + s.lstrip("."))
-        for s in settings.PUSH_ENDPOINT_ALLOWED_SUFFIXES
+        host == s.lstrip(".") or host.endswith("." + s.lstrip(".")) for s in settings.PUSH_ENDPOINT_ALLOWED_SUFFIXES
     )
 
 
@@ -57,6 +58,63 @@ def decode_mime(value: str) -> str:
         return str(make_header(decode_header(value or "")))
     except Exception:  # noqa: BLE001 - malformed headers must never break delivery
         return value or ""
+
+
+PREVIEW_CHARS = 140
+RAW_LIMIT = 256 * 1024
+
+
+class _TextOnly(HTMLParser):
+    """Visible text of an HTML part (scripts, styles and head are skipped)."""
+
+    SKIP = {"script", "style", "head", "title"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self.hidden += 1
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP and self.hidden:
+            self.hidden -= 1
+
+    def handle_data(self, data):
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", " ", CONTROL_CHARS.sub(" ", text or "")).strip()
+
+
+def message_preview(msg) -> str:
+    """The first words of the message body, for the notification. Quoted replies and links are skipped."""
+    try:
+        part = msg.get_body(preferencelist=("plain", "html"))
+        if part is None:
+            return ""
+        text = part.get_content()
+        if part.get_content_type() == "text/html":
+            parser = _TextOnly()
+            parser.feed(text)
+            text = " ".join(parser.parts)
+        lines = [ln for ln in str(text).splitlines() if not ln.lstrip().startswith(">")]
+        text = re.sub(r"https?://\S+", "", " ".join(lines))
+        return _squash(text)[:PREVIEW_CHARS]
+    except Exception:  # noqa: BLE001 - an unreadable body just means no preview
+        return ""
+
+
+def parse_raw_message(raw: bytes) -> tuple[str, str, str]:
+    """(sender, subject, preview) from the start of an RFC 822 message. Nothing is stored or logged."""
+    msg = message_from_bytes(raw[:RAW_LIMIT], policy=policy.default)
+    sender = str(msg.get("From", "") or "")
+    subject = str(msg.get("Subject", "") or "")
+    return sender, subject, message_preview(msg)
 
 
 def notify_users(
@@ -130,7 +188,7 @@ def mail_watchers(mailbox):
 # --------------------------------------------------------------------------- #
 # Events
 # --------------------------------------------------------------------------- #
-def notify_new_mail(recipient: str, sender: str, subject: str) -> int:
+def notify_new_mail(recipient: str, sender: str, subject: str, preview: str = "") -> int:
     from apps.mailboxes.models import Mailbox
 
     mailbox = Mailbox.objects.select_related("business").filter(email__iexact=(recipient or "").strip()).first()
@@ -144,11 +202,12 @@ def notify_new_mail(recipient: str, sender: str, subject: str) -> int:
 
     name, address = parseaddr(decode_mime(sender))
     subject = decode_mime(subject)
-    return notify_users(
+    who = clean(name or address or "New message", 80)
+    sent = notify_users(
         mail_watchers(mailbox),
         kind="mail",
         preference="new_mail",
-        title=clean(name or address or "New message", 80),
+        title=who,
         body=clean(subject, 140) or "(no subject)",
         url=settings.WEBMAIL_URL or "/",
         tag=f"mail:{mailbox.pk}",
@@ -157,6 +216,32 @@ def notify_new_mail(recipient: str, sender: str, subject: str) -> int:
         urgency="high",
         extra={"sender": clean(name or address, 80)},
     )
+    return sent + notify_inbox_devices(mailbox, who=who, subject=subject, preview=preview)
+
+
+def notify_inbox_devices(mailbox, *, who: str, subject: str, preview: str) -> int:
+    """New-mail push for people who read mail in the webmail app (no portal account)."""
+    from .tasks import send_push
+
+    if not push_enabled():
+        return 0
+    ids = list(InboxPushSubscription.objects.filter(mailbox=mailbox, active=True).values_list("pk", flat=True))
+    if not ids:
+        return 0
+    payload = {
+        "kind": "mail",
+        "title": who,
+        "body": clean(subject, 120) or "(no subject)",
+        "preview": clean(preview, PREVIEW_CHARS),
+        "tag": f"mail:{mailbox.pk}",
+        "url": "/SOGo/",
+        "account": mailbox.email,
+        "sender": who,
+        "ts": int(timezone.now().timestamp() * 1000),
+    }
+    for pk in ids:
+        transaction.on_commit(lambda pk=pk: send_push.delay(pk, payload, "high", True))
+    return len(ids)
 
 
 def notify_alert(alert) -> int:
