@@ -24,7 +24,9 @@ Postfix -> Dovecot LDA -> global_sieve_after -> notify-portal.sh -> POST https:/
    ```bash
    mkdir -p data/conf/dovecot/sieve-bin
    cp notify-portal.sh data/conf/dovecot/sieve-bin/ && chmod 755 data/conf/dovecot/sieve-bin/notify-portal.sh
-   cp global_sieve_after data/conf/dovecot/global_sieve_after
+   # Do NOT overwrite data/conf/dovecot/global_sieve_after: current Mailcow already uses it for its own spam and
+   # tag routing. Instead add `require "vnd.dovecot.execute";` to its `require` lines and append the block from
+   # this directory's global_sieve_after (the `if not header ... X-Spam-Flag` part) at the end of the file.
    cat > data/conf/dovecot/sieve-bin/portal-hook.env <<'EOF'
    PORTAL_HOOK_URL=https://portal.bthinkx.com/api/push/new-mail/
    PORTAL_HOOK_TOKEN=<NEW_MAIL_WEBHOOK_TOKEN>
@@ -32,17 +34,19 @@ Postfix -> Dovecot LDA -> global_sieve_after -> notify-portal.sh -> POST https:/
    chmod 640 data/conf/dovecot/sieve-bin/portal-hook.env
    ```
 
-3. Enable the Sieve `execute` extension for global scripts by appending to `data/conf/dovecot/extra.conf`:
+3. Let Sieve `execute` run programs from `sieve-bin` by creating/appending `data/conf/dovecot/extra.conf`:
 
    ```conf
    plugin {
-     sieve_plugins = sieve_imapsieve sieve_extprograms
-     sieve_global_extensions = +vnd.dovecot.execute
      sieve_execute_bin_dir = /etc/dovecot/sieve-bin
    }
    ```
 
-   (If Mailcow's `dovecot.conf` already lists other `sieve_plugins`, keep them in this list.)
+   Current Mailcow already enables `sieve_extprograms` and `+vnd.dovecot.execute` in `dovecot.conf`; only add
+   `sieve_plugins` / `sieve_global_extensions` here if yours does not. Also make the env file readable by the
+   `vmail` group (`chown root:5000 portal-hook.env && chmod 640`).
+
+   When app and mail server are the same host, `https://portal.<domain>` is reachable from the Dovecot container.
 
 4. Apply: `docker compose restart dovecot-mailcow`, then check `docker compose logs dovecot-mailcow | grep -i sieve` for
    compile errors.
